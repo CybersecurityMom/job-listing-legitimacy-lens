@@ -65,6 +65,24 @@ FREE_EMAIL_DOMAINS = [
     "icloud.com",
 ]
 
+# Common places you’d reasonably find legit listings
+KNOWN_JOB_SITES = [
+    "linkedin",
+    "indeed",
+    "glassdoor",
+    "ziprecruiter",
+    "monster",
+    "usajobs",
+    "usa jobs",
+    "career page",
+    "careers page",
+    "company site",
+    "company website",
+    "workday",
+    "greenhouse",
+    "lever",
+]
+
 
 def analyze_job(company, source, description, email):
     """
@@ -89,43 +107,56 @@ def analyze_job(company, source, description, email):
     else:
         reasons.append("Company name provided.")
 
-    # --- Source site ---
+    # --- Source site / platform ---
     if not source_clean:
-        risk += 10
+        risk += 15
         reasons.append("No source site provided (e.g., LinkedIn, company site).")
     else:
         reasons.append(f"Job source provided: {source_clean}.")
+        src_lower = source_clean.lower()
+        if not any(site in src_lower for site in KNOWN_JOB_SITES):
+            risk += 12
+            reasons.append(
+                "Job source is not a common job platform or clear company site; review carefully."
+            )
 
     # --- Description length / clarity ---
     desc_len = len(desc_clean)
-    if desc_len < 50:
-        risk += 25
+    if desc_len == 0:
+        risk += 40
+        reasons.append("No job description provided at all.")
+    elif desc_len < 50:
+        risk += 30
         reasons.append("Description is extremely short/vague (less than 50 characters).")
     elif desc_len < 120:
-        risk += 10
+        risk += 12
         reasons.append("Description is short and may be missing important details.")
     elif desc_len < 400:
         reasons.append("Description has reasonable length.")
     else:
         reasons.append("Description is detailed and provides plenty of information.")
 
+    # --- All caps check (shouty / spammy tone) ---
+    if desc_len > 0 and desc_clean.isupper():
+        risk += 12
+        reasons.append("Description is written in all caps (unprofessional / spam-like tone).")
+
     # --- General scammy phrases ---
     found_general = [p for p in GENERAL_RED_FLAGS if p in desc_lower]
     if found_general:
-        # These are pretty serious, but cap the impact
         risk += min(32, 8 * len(found_general))
         reasons.append("Potential scam signals found: " + ", ".join(found_general) + ".")
 
     # --- Too-good-to-be-true promises ---
     found_too_good = [p for p in TOO_GOOD_TO_BE_TRUE if p in desc_lower]
     if found_too_good:
-        risk += min(20, 10 + 5 * len(found_too_good))
+        risk += min(24, 10 + 5 * len(found_too_good))
         reasons.append("Unrealistic earning claims detected: " + ", ".join(found_too_good) + ".")
 
     # --- Pressure language ---
     found_pressure = [p for p in PRESSURE_PHRASES if p in desc_lower]
     if found_pressure:
-        risk += min(18, 6 * len(found_pressure))
+        risk += min(20, 6 * len(found_pressure))
         reasons.append("High-pressure language detected: " + ", ".join(found_pressure) + ".")
 
     # --- Compensation red flags (your “peanuts” case lives here) ---
@@ -144,15 +175,17 @@ def analyze_job(company, source, description, email):
             domain = email_clean.split("@")[-1].lower()
             if domain in FREE_EMAIL_DOMAINS:
                 risk += 8
-                reasons.append("Email uses a free domain (may be fine, but less professional).")
+                reasons.append(
+                    "Email uses a free domain (may be fine, but slightly less professional)."
+                )
         else:
-            risk += 12
+            risk += 18
             reasons.append("Contact email format looks invalid.")
     else:
-        risk += 10
+        risk += 12
         reasons.append("No contact email provided.")
 
-    # --- Simple positive signals (tiny risk reduction, not huge) ---
+    # --- Simple positive signals (tiny risk reduction) ---
     positive_hits = 0
     POSITIVE_KEYWORDS = [
         "health insurance",
@@ -160,6 +193,7 @@ def analyze_job(company, source, description, email):
         "401k",
         "benefits",
         "paid time off",
+        "pto",
         "salary",
         "full-time",
         "competitive pay",
@@ -169,7 +203,6 @@ def analyze_job(company, source, description, email):
             positive_hits += 1
 
     if positive_hits:
-        # Reduce risk slightly, but never below zero
         reduction = min(10, 3 * positive_hits)
         risk = max(0, risk - reduction)
         reasons.append(
@@ -179,9 +212,9 @@ def analyze_job(company, source, description, email):
     # --- Compute trust score ---
     trust_score = max(0, min(100, 100 - risk))
 
-    if trust_score >= 75:
+    if trust_score >= 80:
         label = "Likely Legitimate (based on these checks)"
-    elif trust_score >= 50:
+    elif trust_score >= 55:
         label = "Mixed Signals / Needs More Info"
     else:
         label = "High Risk / Suspicious"
