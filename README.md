@@ -1,34 +1,51 @@
+# Job Listing Legitimacy Lens
 
+This is a tiny prototype that gives a rough “trust score” for job listings using simple rule-based checks. It was inspired by a mental model developed earlier in the Innovation Lab exploring how job seekers determine whether a job posting is legitimate.
 
-This is a tiny prototype that gives a rough “trust score” for job listings using simple rule-based checks. It was inspired by a mental model our Innovation Lab explored earlier in the program: helping job seekers understand if a job posting looks legitimate or suspicious.
-
-This demo shows how research and mental models can turn into a simple working tool.
+This is NOT a real security tool.  
+It is a simple teaching prototype that turns mental models into code.
 
 ---
 
-## 🔍 What this tool does
+## 🔍 What the tool does
 
-- Takes in:
-  - company name
-  - where you found the job
-  - contact email
-  - full job description
+- Asks for:
+  - Company name
+  - Where the listing was found
+  - Contact email
+  - Full job description
 
 - Checks for:
-  - missing company details
-  - vague or very short descriptions
-  - suspicious phrases (like “wire money” or “earn money fast”)
-  - free email domains
-  - pressure-language
+  - Missing company information
+  - Very short/vague job descriptions
+  - Suspicious “red flag” phrases
+  - Free email domains
+  - Pressure-language
 
 - Returns:
-  - a **trust score** (0–100)
-  - a **label** (Likely Legitimate, Needs More Info, or High Risk)
-  - clear explanations for each signal
+  - A trust score (0–100)
+  - A category:
+    - Likely Legitimate
+    - Needs More Info
+    - High Risk
+  - Clear explanations for each signal
 
-This is NOT a real security tool — it’s a teaching prototype to show how mental models and logic can support job seekers.
+---
+
+## 🛠️ How to run the tool
+
+
+Paste the job description, then type:
+
 
 ---
 
 ## 📂 Project structure
 
+
+
+---
+
+## 🙏 Credits
+
+Created by Aqueelah Emanuel as a bonus exploration project to demonstrate turning research and mental models into working prototypes.
