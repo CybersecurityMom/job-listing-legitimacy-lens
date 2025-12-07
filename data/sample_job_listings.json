@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "label": "likely_legit",
+    "company_name": "Riverstone Analytics",
+    "source_site": "LinkedIn",
+    "contact_email": "careers@riverstone-analytics.com",
+    "description": "Hiring junior data analyst. Full-time. Normal job duties. Experience preferred."
+  },
+  {
+    "id": 2,
+    "label": "suspicious",
+    "company_name": "",
+    "source_site": "",
+    "contact_email": "jobsnow@gmail.com",
+    "description": "Earn money fast! No experience needed! Send payment for training fee to start."
+  },
+  {
+    "id": 3,
+    "label": "needs_more_info",
+    "company_name": "Northstar Global",
+    "source_site": "Job board",
+    "contact_email": "",
+    "description": "Hiring remote assistants. Flexible hours. Submit resume online."
+  }
+]
