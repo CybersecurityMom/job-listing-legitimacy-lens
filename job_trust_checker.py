@@ -91,8 +91,10 @@ def analyze_job(company, source, description, email):
     - label (Likely Legitimate / Mixed Signals / High Risk)
     - reasons (list of human-readable strings)
     """
+
     reasons = []
     risk = 0
+    critical_flags = 0  # how many "this is really not okay" signals we hit
 
     company_clean = company.strip()
     source_clean = source.strip()
@@ -103,19 +105,22 @@ def analyze_job(company, source, description, email):
     # --- Company name ---
     if not company_clean:
         risk += 20
+        critical_flags += 1
         reasons.append("No company name provided.")
     else:
         reasons.append("Company name provided.")
 
     # --- Source site / platform ---
     if not source_clean:
-        risk += 15
+        risk += 20
+        critical_flags += 1
         reasons.append("No source site provided (e.g., LinkedIn, company site).")
     else:
         reasons.append(f"Job source provided: {source_clean}.")
         src_lower = source_clean.lower()
         if not any(site in src_lower for site in KNOWN_JOB_SITES):
-            risk += 12
+            risk += 30
+            critical_flags += 1
             reasons.append(
                 "Job source is not a common job platform or clear company site; review carefully."
             )
@@ -123,13 +128,15 @@ def analyze_job(company, source, description, email):
     # --- Description length / clarity ---
     desc_len = len(desc_clean)
     if desc_len == 0:
-        risk += 40
+        risk += 50
+        critical_flags += 1
         reasons.append("No job description provided at all.")
     elif desc_len < 50:
         risk += 30
+        critical_flags += 1
         reasons.append("Description is extremely short/vague (less than 50 characters).")
     elif desc_len < 120:
-        risk += 12
+        risk += 15
         reasons.append("Description is short and may be missing important details.")
     elif desc_len < 400:
         reasons.append("Description has reasonable length.")
@@ -138,34 +145,42 @@ def analyze_job(company, source, description, email):
 
     # --- All caps check (shouty / spammy tone) ---
     if desc_len > 0 and desc_clean.isupper():
-        risk += 12
+        risk += 15
         reasons.append("Description is written in all caps (unprofessional / spam-like tone).")
 
     # --- General scammy phrases ---
-    found_general = [p for p in GENERAL_RED_FLAGS if p in desc_lower]
-    if found_general:
-        risk += min(32, 8 * len(found_general))
-        reasons.append("Potential scam signals found: " + ", ".join(found_general) + ".")
+    gen_hits = [p for p in GENERAL_RED_FLAGS if p in desc_lower]
+    if gen_hits:
+        risk += 40
+        critical_flags += 1
+        reasons.append("Potential scam signals found: " + ", ".join(gen_hits) + ".")
 
     # --- Too-good-to-be-true promises ---
-    found_too_good = [p for p in TOO_GOOD_TO_BE_TRUE if p in desc_lower]
-    if found_too_good:
-        risk += min(24, 10 + 5 * len(found_too_good))
-        reasons.append("Unrealistic earning claims detected: " + ", ".join(found_too_good) + ".")
+    tgood_hits = [p for p in TOO_GOOD_TO_BE_TRUE if p in desc_lower]
+    if tgood_hits:
+        risk += 20
+        critical_flags += 1
+        reasons.append(
+            "Unrealistic earning claims detected: " + ", ".join(tgood_hits) + "."
+        )
 
     # --- Pressure language ---
-    found_pressure = [p for p in PRESSURE_PHRASES if p in desc_lower]
-    if found_pressure:
-        risk += min(20, 6 * len(found_pressure))
-        reasons.append("High-pressure language detected: " + ", ".join(found_pressure) + ".")
+    pressure_hits = [p for p in PRESSURE_PHRASES if p in desc_lower]
+    if pressure_hits:
+        risk += 15
+        reasons.append(
+            "High-pressure language detected: " + ", ".join(pressure_hits) + "."
+        )
 
     # --- Compensation red flags (your “peanuts” case lives here) ---
-    found_comp = [p for p in COMPENSATION_RED_FLAGS if p in desc_lower]
-    if found_comp:
-        risk += 30  # strong penalty
+    comp_hits = [p for p in COMPENSATION_RED_FLAGS if p in desc_lower]
+    if comp_hits:
+        risk += 40
+        critical_flags += 1
         reasons.append(
             "Compensation red flags detected (potentially exploitative terms): "
-            + ", ".join(found_comp) + "."
+            + ", ".join(comp_hits)
+            + "."
         )
 
     # --- Email checks ---
@@ -174,15 +189,17 @@ def analyze_job(company, source, description, email):
         if "@" in email_clean:
             domain = email_clean.split("@")[-1].lower()
             if domain in FREE_EMAIL_DOMAINS:
-                risk += 8
+                risk += 10
                 reasons.append(
                     "Email uses a free domain (may be fine, but slightly less professional)."
                 )
         else:
-            risk += 18
+            risk += 35
+            critical_flags += 1
             reasons.append("Contact email format looks invalid.")
     else:
-        risk += 12
+        risk += 25
+        critical_flags += 1
         reasons.append("No contact email provided.")
 
     # --- Simple positive signals (tiny risk reduction) ---
@@ -209,12 +226,22 @@ def analyze_job(company, source, description, email):
             f"Some structured compensation/benefits language present ({positive_hits} positive signals)."
         )
 
-    # --- Compute trust score ---
+    # --- Base trust score ---
     trust_score = max(0, min(100, 100 - risk))
 
-    if trust_score >= 80:
+    # --- Clamp score based on how many critical flags we saw ---
+    # 3+ big problems? This should never look "okay".
+    if critical_flags >= 3 and trust_score > 40:
+        trust_score = 40
+    elif critical_flags == 2 and trust_score > 55:
+        trust_score = 55
+    elif critical_flags == 1 and trust_score > 70:
+        trust_score = 70
+
+    # --- Label based on final score ---
+    if trust_score >= 85:
         label = "Likely Legitimate (based on these checks)"
-    elif trust_score >= 55:
+    elif trust_score >= 60:
         label = "Mixed Signals / Needs More Info"
     else:
         label = "High Risk / Suspicious"
