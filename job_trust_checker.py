@@ -7,6 +7,8 @@ A tiny rule-based tool that gives a rough "trust score" for a job listing.
 This is for teaching and demo purposes only, not real-world verification.
 """
 
+import re
+
 # Phrases that often show up in obvious scams or shady posts
 GENERAL_RED_FLAGS = [
     "wire money",
@@ -16,7 +18,6 @@ GENERAL_RED_FLAGS = [
     "routing number",
     "gift card",
     "gift cards",
-    "crypto",
     "cryptocurrency",
     "bitcoin",
     "training fee",
@@ -54,6 +55,15 @@ COMPENSATION_RED_FLAGS = [
     "unpaid internship",
     "no salary",
     "no compensation",
+]
+
+# Direct payment apps (bad sign for a "job")
+PAYMENT_APP_RED_FLAGS = [
+    "venmo",
+    "cash app",
+    "cashapp",
+    "paypal",
+    "zelle",
 ]
 
 FREE_EMAIL_DOMAINS = [
@@ -94,7 +104,7 @@ def analyze_job(company, source, description, email):
 
     reasons = []
     risk = 0
-    critical_flags = 0  # how many "this is really not okay" signals we hit
+    critical_flags = 0  # count “this is really not okay” signals
 
     company_clean = company.strip()
     source_clean = source.strip()
@@ -158,11 +168,45 @@ def analyze_job(company, source, description, email):
     # --- Too-good-to-be-true promises ---
     tgood_hits = [p for p in TOO_GOOD_TO_BE_TRUE if p in desc_lower]
     if tgood_hits:
-        risk += 20
+        risk += 25
         critical_flags += 1
         reasons.append(
             "Unrealistic earning claims detected: " + ", ".join(tgood_hits) + "."
         )
+
+    # --- Payment app red flags (e.g., Venmo) ---
+    pay_hits = [p for p in PAYMENT_APP_RED_FLAGS if p in desc_lower]
+    if pay_hits:
+        risk += 35
+        critical_flags += 1
+        reasons.append(
+            "Direct payment via apps detected (unusual for legitimate jobs): "
+            + ", ".join(pay_hits)
+            + "."
+        )
+
+    # --- Salary validity check (unrealistic high salaries) ---
+    # Look for dollar amounts and "million" indicators
+    salary_pattern = re.findall(
+        r"\$?(\d{1,3}(?:,\d{3})+|\d+)(?:\s*(million|billion))?", desc_lower
+    )
+    unrealistic_salary = False
+
+    for amount, multiplier in salary_pattern:
+        amount_value = int(amount.replace(",", ""))
+
+        # If "million" or "billion" is present, or the word appears anywhere, unrealistic
+        if multiplier in ("million", "billion") or "million" in desc_lower or "billion" in desc_lower:
+            unrealistic_salary = True
+
+        # Salary above $500k is unrealistic for typical postings
+        if amount_value > 500000:
+            unrealistic_salary = True
+
+    if unrealistic_salary:
+        risk += 40
+        critical_flags += 1
+        reasons.append("Salary appears unrealistic or inflated for this job posting.")
 
     # --- Pressure language ---
     pressure_hits = [p for p in PRESSURE_PHRASES if p in desc_lower]
@@ -172,7 +216,7 @@ def analyze_job(company, source, description, email):
             "High-pressure language detected: " + ", ".join(pressure_hits) + "."
         )
 
-    # --- Compensation red flags (your “peanuts” case lives here) ---
+    # --- Compensation red flags (exploitative terms) ---
     comp_hits = [p for p in COMPENSATION_RED_FLAGS if p in desc_lower]
     if comp_hits:
         risk += 40
@@ -188,7 +232,14 @@ def analyze_job(company, source, description, email):
         reasons.append(f"Contact email provided: {email_clean}.")
         if "@" in email_clean:
             domain = email_clean.split("@")[-1].lower()
-            if domain in FREE_EMAIL_DOMAINS:
+            if "." not in domain:
+                # no .com / .org / etc.
+                risk += 35
+                critical_flags += 1
+                reasons.append(
+                    "Contact email domain is missing a dot (e.g., .com); format looks invalid."
+                )
+            elif domain in FREE_EMAIL_DOMAINS:
                 risk += 10
                 reasons.append(
                     "Email uses a free domain (may be fine, but slightly less professional)."
@@ -196,7 +247,7 @@ def analyze_job(company, source, description, email):
         else:
             risk += 35
             critical_flags += 1
-            reasons.append("Contact email format looks invalid.")
+            reasons.append("Contact email format looks invalid (no @ symbol).")
     else:
         risk += 25
         critical_flags += 1
@@ -204,6 +255,7 @@ def analyze_job(company, source, description, email):
 
     # --- Simple positive signals (tiny risk reduction) ---
     positive_hits = 0
+    # NOTICE: we do NOT include "salary" here so wild salary claims never look positive.
     POSITIVE_KEYWORDS = [
         "health insurance",
         "medical insurance",
@@ -211,7 +263,6 @@ def analyze_job(company, source, description, email):
         "benefits",
         "paid time off",
         "pto",
-        "salary",
         "full-time",
         "competitive pay",
     ]
@@ -230,13 +281,13 @@ def analyze_job(company, source, description, email):
     trust_score = max(0, min(100, 100 - risk))
 
     # --- Clamp score based on how many critical flags we saw ---
-    # 3+ big problems? This should never look "okay".
-    if critical_flags >= 3 and trust_score > 40:
-        trust_score = 40
-    elif critical_flags == 2 and trust_score > 55:
-        trust_score = 55
-    elif critical_flags == 1 and trust_score > 70:
-        trust_score = 70
+    # If there are multiple major problems, the score should never look "okay".
+    if critical_flags >= 3 and trust_score > 25:
+        trust_score = 25
+    elif critical_flags == 2 and trust_score > 45:
+        trust_score = 45
+    elif critical_flags == 1 and trust_score > 65:
+        trust_score = 65
 
     # --- Label based on final score ---
     if trust_score >= 85:
