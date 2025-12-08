@@ -91,6 +91,8 @@ KNOWN_JOB_SITES = [
     "workday",
     "greenhouse",
     "lever",
+    "careerbuilder",
+    "career builder",
 ]
 
 # Words that sound like a real job description, not just vibes
@@ -103,6 +105,7 @@ PROFESSIONAL_KEYWORDS = [
     "experiences",
     "position",
     "role",
+    "roles",
     "skills",
     "skill",
     "schedule",
@@ -158,11 +161,14 @@ def analyze_job(company, source, description, email):
         reasons.append(f"Job source provided: {source_clean}.")
         src_lower = source_clean.lower()
         if not any(site in src_lower for site in KNOWN_JOB_SITES):
-            risk += 30
-            critical_flags += 1
+            # Softer penalty here – unknown does NOT always mean bad
+            risk += 15
             unknown_source = True
             reasons.append(
-                "Job source is not a common job platform or clear company site; review carefully."
+                "This job source is not in this tool's list of common job boards. "
+                "That does NOT automatically mean it is fake, but it is worth double-checking:\n"
+                "  • Are you on the official company careers page or a trusted local board?\n"
+                "  • Does the URL look correct (HTTPS, correct spelling, real company branding)?"
             )
 
     # --- Description length / clarity ---
@@ -187,20 +193,16 @@ def analyze_job(company, source, description, email):
     if desc_len > 0 and desc_clean.isupper():
         risk += 20
         critical_flags += 1
-        reasons.append("Description is written in all caps (unprofessional / spam-like tone).")
+        reasons.append("Description is written in ALL CAPS (unprofessional / spam-like tone).")
 
-    # --- Professional language check ---
+    # --- Professional language check (soft signal) ---
     pro_hits = sum(1 for kw in PROFESSIONAL_KEYWORDS if kw in desc_lower)
     if pro_hits == 0:
-        # Sounds more like a casual ad than a structured job
-        risk += 25
+        risk += 10
         reasons.append(
-            "Description does not use typical job/role language (responsibilities, requirements, etc.)."
+            "Description uses plain language but does not mention typical job/role terms "
+            "(responsibilities, requirements, role, etc.). Consider asking for more detail."
         )
-        # If source is also sketchy or email is bad, treat this as critical
-        # (this catches your silly / joke descriptions)
-        # critical flag only when stacked with other weirdness
-    # (don’t mark as critical yet; we’ll handle in gating below)
 
     # --- General scammy phrases ---
     gen_hits = [p for p in GENERAL_RED_FLAGS if p in desc_lower]
@@ -294,27 +296,53 @@ def analyze_job(company, source, description, email):
         invalid_email = True
         reasons.append("No contact email provided.")
 
-    # --- Simple positive signals (tiny risk reduction only) ---
+    # --- Simple positive signals (slightly lower risk) ---
     positive_hits = 0
     POSITIVE_KEYWORDS = [
         "health insurance",
         "medical insurance",
+        "dental insurance",
+        "vision insurance",
+        "health, dental, vision",
+        "full health and dental",
         "401k",
-        "benefits",
+        "401(k)",
+        "retirement plan",
+        "retirement benefits",
         "paid time off",
+        "paid vacation",
+        "vacation time",
+        "sick leave",
         "pto",
         "full-time",
-        "competitive pay",
+        "part-time",
+        "remote",
+        "hybrid",
+        "training provided",
+        "training included",
+        "paid training",
+        "professional development",
+        "onboarding",
+        "schedule",
+        "set schedule",
+        "hourly rate",
+        "per hour",
+        "per year",
+        "annual salary",
+        "salary range",
     ]
+
     for kw in POSITIVE_KEYWORDS:
         if kw in desc_lower:
+            if unrealistic_salary and "salary" in kw:
+                continue
             positive_hits += 1
 
     if positive_hits:
-        reduction = min(8, 2 * positive_hits)
+        reduction = min(12, 3 * positive_hits)
         risk = max(0, risk - reduction)
         reasons.append(
-            f"Some structured compensation/benefits language present ({positive_hits} positive signals)."
+            f"Detected {positive_hits} positive structure signals (benefits, pay details, schedule, etc.)."
         )
 
     # --- Base trust score ---
@@ -327,22 +355,21 @@ def analyze_job(company, source, description, email):
         trust_score = min(trust_score, 30)
         critical_flags += 1
 
-    # If description is short & source is weird OR email bad -> also lower
+    # If description is short & source is weird OR email bad -> lower
     if desc_len < 120 and (unknown_source or invalid_email):
-        trust_score = min(trust_score, 40)
+        trust_score = min(trust_score, 45)
 
     # If payment apps OR unrealistic salary are present -> never above 35
     if payment_red_flagged or unrealistic_salary:
         trust_score = min(trust_score, 35)
 
     # If there is NO professional language AND (unknown source or invalid email),
-    # treat that combo as critical (sounds like a joke ad, not a job)
+    # treat that combo as extra suspicious.
     if pro_hits == 0 and (unknown_source or invalid_email):
         critical_flags += 1
         trust_score = min(trust_score, 40)
 
     # --- Clamp score based on how many critical flags we saw ---
-    # Much stricter now: 3+ big problems = very low.
     if critical_flags >= 3 and trust_score > 20:
         trust_score = 20
     elif critical_flags == 2 and trust_score > 40:
@@ -392,5 +419,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
