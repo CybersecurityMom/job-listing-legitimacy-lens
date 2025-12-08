@@ -93,6 +93,29 @@ KNOWN_JOB_SITES = [
     "lever",
 ]
 
+# Words that sound like a real job description, not just vibes
+PROFESSIONAL_KEYWORDS = [
+    "responsibilities",
+    "responsibility",
+    "requirements",
+    "requirement",
+    "experience",
+    "experiences",
+    "position",
+    "role",
+    "skills",
+    "skill",
+    "schedule",
+    "hours",
+    "shift",
+    "candidate",
+    "candidates",
+    "qualification",
+    "qualifications",
+    "apply",
+    "application",
+]
+
 
 def analyze_job(company, source, description, email):
     """
@@ -112,6 +135,11 @@ def analyze_job(company, source, description, email):
     desc_clean = description.strip()
     desc_lower = desc_clean.lower()
 
+    unknown_source = False
+    invalid_email = False
+    unrealistic_salary = False
+    payment_red_flagged = False
+
     # --- Company name ---
     if not company_clean:
         risk += 20
@@ -124,6 +152,7 @@ def analyze_job(company, source, description, email):
     if not source_clean:
         risk += 20
         critical_flags += 1
+        unknown_source = True
         reasons.append("No source site provided (e.g., LinkedIn, company site).")
     else:
         reasons.append(f"Job source provided: {source_clean}.")
@@ -131,6 +160,7 @@ def analyze_job(company, source, description, email):
         if not any(site in src_lower for site in KNOWN_JOB_SITES):
             risk += 30
             critical_flags += 1
+            unknown_source = True
             reasons.append(
                 "Job source is not a common job platform or clear company site; review carefully."
             )
@@ -146,7 +176,7 @@ def analyze_job(company, source, description, email):
         critical_flags += 1
         reasons.append("Description is extremely short/vague (less than 50 characters).")
     elif desc_len < 120:
-        risk += 15
+        risk += 18
         reasons.append("Description is short and may be missing important details.")
     elif desc_len < 400:
         reasons.append("Description has reasonable length.")
@@ -155,8 +185,22 @@ def analyze_job(company, source, description, email):
 
     # --- All caps check (shouty / spammy tone) ---
     if desc_len > 0 and desc_clean.isupper():
-        risk += 15
+        risk += 20
+        critical_flags += 1
         reasons.append("Description is written in all caps (unprofessional / spam-like tone).")
+
+    # --- Professional language check ---
+    pro_hits = sum(1 for kw in PROFESSIONAL_KEYWORDS if kw in desc_lower)
+    if pro_hits == 0:
+        # Sounds more like a casual ad than a structured job
+        risk += 25
+        reasons.append(
+            "Description does not use typical job/role language (responsibilities, requirements, etc.)."
+        )
+        # If source is also sketchy or email is bad, treat this as critical
+        # (this catches your silly / joke descriptions)
+        # critical flag only when stacked with other weirdness
+    # (don’t mark as critical yet; we’ll handle in gating below)
 
     # --- General scammy phrases ---
     gen_hits = [p for p in GENERAL_RED_FLAGS if p in desc_lower]
@@ -179,6 +223,7 @@ def analyze_job(company, source, description, email):
     if pay_hits:
         risk += 35
         critical_flags += 1
+        payment_red_flagged = True
         reasons.append(
             "Direct payment via apps detected (unusual for legitimate jobs): "
             + ", ".join(pay_hits)
@@ -186,22 +231,16 @@ def analyze_job(company, source, description, email):
         )
 
     # --- Salary validity check (unrealistic high salaries) ---
-    # Look for dollar amounts and "million" indicators
     salary_pattern = re.findall(
         r"\$?(\d{1,3}(?:,\d{3})+|\d+)(?:\s*(million|billion))?", desc_lower
     )
-    unrealistic_salary = False
-
-    for amount, multiplier in salary_pattern:
-        amount_value = int(amount.replace(",", ""))
-
-        # If "million" or "billion" is present, or the word appears anywhere, unrealistic
-        if multiplier in ("million", "billion") or "million" in desc_lower or "billion" in desc_lower:
-            unrealistic_salary = True
-
-        # Salary above $500k is unrealistic for typical postings
-        if amount_value > 500000:
-            unrealistic_salary = True
+    if salary_pattern:
+        for amount, multiplier in salary_pattern:
+            amount_value = int(amount.replace(",", ""))
+            if multiplier in ("million", "billion") or "million" in desc_lower or "billion" in desc_lower:
+                unrealistic_salary = True
+            if amount_value > 500000:
+                unrealistic_salary = True
 
     if unrealistic_salary:
         risk += 40
@@ -233,9 +272,9 @@ def analyze_job(company, source, description, email):
         if "@" in email_clean:
             domain = email_clean.split("@")[-1].lower()
             if "." not in domain:
-                # no .com / .org / etc.
                 risk += 35
                 critical_flags += 1
+                invalid_email = True
                 reasons.append(
                     "Contact email domain is missing a dot (e.g., .com); format looks invalid."
                 )
@@ -247,15 +286,16 @@ def analyze_job(company, source, description, email):
         else:
             risk += 35
             critical_flags += 1
+            invalid_email = True
             reasons.append("Contact email format looks invalid (no @ symbol).")
     else:
         risk += 25
         critical_flags += 1
+        invalid_email = True
         reasons.append("No contact email provided.")
 
-    # --- Simple positive signals (tiny risk reduction) ---
+    # --- Simple positive signals (tiny risk reduction only) ---
     positive_hits = 0
-    # NOTICE: we do NOT include "salary" here so wild salary claims never look positive.
     POSITIVE_KEYWORDS = [
         "health insurance",
         "medical insurance",
@@ -271,7 +311,7 @@ def analyze_job(company, source, description, email):
             positive_hits += 1
 
     if positive_hits:
-        reduction = min(10, 3 * positive_hits)
+        reduction = min(8, 2 * positive_hits)
         risk = max(0, risk - reduction)
         reasons.append(
             f"Some structured compensation/benefits language present ({positive_hits} positive signals)."
@@ -280,14 +320,35 @@ def analyze_job(company, source, description, email):
     # --- Base trust score ---
     trust_score = max(0, min(100, 100 - risk))
 
+    # --- Extra gating rules for “obviously weird” combos ---
+
+    # If source is weird AND email is bad   -> very low ceiling
+    if unknown_source and invalid_email:
+        trust_score = min(trust_score, 30)
+        critical_flags += 1
+
+    # If description is short & source is weird OR email bad -> also lower
+    if desc_len < 120 and (unknown_source or invalid_email):
+        trust_score = min(trust_score, 40)
+
+    # If payment apps OR unrealistic salary are present -> never above 35
+    if payment_red_flagged or unrealistic_salary:
+        trust_score = min(trust_score, 35)
+
+    # If there is NO professional language AND (unknown source or invalid email),
+    # treat that combo as critical (sounds like a joke ad, not a job)
+    if pro_hits == 0 and (unknown_source or invalid_email):
+        critical_flags += 1
+        trust_score = min(trust_score, 40)
+
     # --- Clamp score based on how many critical flags we saw ---
-    # If there are multiple major problems, the score should never look "okay".
-    if critical_flags >= 3 and trust_score > 25:
-        trust_score = 25
-    elif critical_flags == 2 and trust_score > 45:
-        trust_score = 45
-    elif critical_flags == 1 and trust_score > 65:
-        trust_score = 65
+    # Much stricter now: 3+ big problems = very low.
+    if critical_flags >= 3 and trust_score > 20:
+        trust_score = 20
+    elif critical_flags == 2 and trust_score > 40:
+        trust_score = 40
+    elif critical_flags == 1 and trust_score > 60:
+        trust_score = 60
 
     # --- Label based on final score ---
     if trust_score >= 85:
@@ -331,3 +392,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
