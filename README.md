@@ -2,7 +2,7 @@
 # 🔍 Job Listing Legitimacy Lens (Demo)
 
 A beginner-friendly Python tool that helps users quickly assess whether a job listing shows signs of legitimacy or potential fraud.  
-This is **not** a verification engine — it is a **signal-based assistant** designed to highlight red flags, positive indicators, and elements that require closer attention.
+This is **not** a verification engine; it is a **signal-based assistant** designed to highlight red flags, positive indicators, and elements that require closer attention.
 
 ---
 
