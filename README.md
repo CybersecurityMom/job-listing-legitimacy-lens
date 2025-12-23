@@ -1,124 +1,122 @@
 
-# 🔍 Job Listing Legitimacy Lens (Demo)
+Job Listing Legitimacy Lens (Demo)
 
-A beginner-friendly Python tool that helps users quickly assess whether a job listing shows signs of legitimacy or potential fraud.  
-This is **not** a verification engine; it is a **signal-based assistant** designed to highlight red flags, positive indicators, and elements that require closer attention.
+A beginner-friendly Python tool that helps users assess whether a job listing shows signs of legitimacy or potential fraud.
 
----
+This project is not a verification engine. It is a signal-based assistant designed to surface red flags, positive indicators, and elements that require closer human review.
 
-## ✨ What This Tool Does
+The goal is awareness and education, not automated decision-making.
 
-The Job Listing Legitimacy Lens analyzes four key components:
+What This Tool Does
 
-1. **Company Name**
-2. **Job Source** (where the listing was found)
-3. **Contact Email**
-4. **Job Description**
+The Job Listing Legitimacy Lens analyzes four core components of a job posting:
 
-Using pattern checks, keyword detection, and risk scoring, it estimates whether a job is:
+Company name
 
-- **Likely Legitimate**
-- **Caution / Mixed Signals**
-- **High Risk / Suspicious**
+Job source (where the listing was found)
 
-It also provides **human-readable explanations** for its decisions — helping users learn *why* something might be unsafe.
+Contact email
 
----
+Job description
 
-## ⭐ Updated & Enhanced Features
+Using pattern checks, keyword detection, and weighted scoring, the tool categorizes listings as:
 
-### **1. Smarter Job Source Evaluation**
-- Recognizes reputable platforms such as:
-  - Indeed  
-  - LinkedIn  
-  - Glassdoor  
-  - CareerBuilder  
-  - ZipRecruiter  
-- Accepts unfamiliar sources *without automatically penalizing them as scams*.
-- If the source is unknown or nonstandard, the tool simply flags it with:
-  > “Not a common platform — double-check that the link belongs to the real company.”
+Likely Legitimate
 
-This avoids false negatives while still encouraging user caution.
+Caution / Mixed Signals
 
----
+High Risk / Suspicious
 
-### **2. Stronger Email Validation**
-The tool now checks whether an email is **properly formatted**, including:
+Each assessment includes human-readable explanations so users understand why something may appear risky or credible.
 
-- Must contain `@`
-- Must contain a valid domain structure (`example.com`, `company.org`, `team.co`, etc.)
-- Flags incomplete or malformed domains (e.g., `chef@gma`, `back@p`)
-- Highlights suspicious free-mail usage in job postings
+Features
+Smarter Job Source Evaluation
 
----
+Recognizes common job platforms such as Indeed, LinkedIn, Glassdoor, CareerBuilder, and ZipRecruiter.
 
-### **3. Critical Red-Flag Detection (New & Expanded)**
+Unfamiliar or nonstandard platforms are not automatically penalized. Instead, the tool flags them with a recommendation to confirm that the listing links to the employer’s official website.
 
-The tool now looks for high-risk patterns including:
+Stronger Email Validation
 
-- Payment apps used for salary:
-  - Cash App  
-  - Zelle  
-  - Venmo  
-  - PayPal  
-- Unrealistic salaries or exaggerated earnings  
-- Requests for:
-  - Upfront payment  
-  - Personal information  
-- Run-on hype language (“we are so cool,” “super rad,” “better than the Arctic”)
-- Repetitive nonsense strings (common in scam/bot-generated ads)
-- Missing job duties or requirements  
+Evaluates whether an email address:
 
-If any major red flag is detected → **risk score automatically drops heavily**.
+Contains a valid @ structure
 
----
+Uses a realistic domain (for example, .com, .org, .co)
 
-### **4. Expanded Positive Signals**
-The tool now rewards job descriptions that include legitimate-looking structure, including:
+Malformed or incomplete domains are flagged.
+Free-mail usage in professional job postings is highlighted when appropriate.
 
-- Salary ranges  
-- Defined responsibilities  
-- Qualifications or experience requirements  
-- Benefits such as:
-  - 401k
-  - Insurance
-  - PTO
-  - Retirement plans  
-  - Holidays  
-- Industry-standard language that real HR teams use
+Critical Red Flag Detection
 
-Each positive keyword reduces risk slightly — up to a safe maximum.
+Detects high-risk patterns including:
 
----
+Salary payment via Cash App, Zelle, Venmo, or PayPal
 
-### **5. Improved Scoring System (More Realistic)**
+Unrealistic salary claims
 
-**Final Score Categories:**
+Requests for upfront payment or personal information
 
-| Score | Assessment |
-|-------|------------|
-| **90–100** | Likely Legitimate (based on provided signals) |
-| **70–89**  | Caution / Mixed Signals |
-| **40–69**  | Mixed Signals / Needs Verification |
-| **0–39**   | High Risk / Suspicious |
+Excessive hype or informal language
 
-Important:  
-Legitimacy ≠ guaranteed safety.  
-The tool assesses *patterns*, not real company identity.
+Repetitive or nonsensical text commonly seen in scam or bot-generated ads
 
----
+Missing job duties or qualification requirements
 
-### **6. Helpful User Guidance When Needed**
-If the tool detects uncertainty, for example, an unfamiliar job board. It now gently recommends:
+When major red flags are detected, the risk score is reduced significantly.
 
-> “This may be legitimate, but always double-check that you are on the employer’s official site.”
+Expanded Positive Signals
 
-This supports user education without penalizing legitimate newer platforms.
+Rewards legitimate job structure, including:
 
----
+Salary ranges
 
-## 🖥️ How to Run the Tool (Mac Instructions)
+Clearly defined responsibilities
 
-1. **Download or clone the repository:**
-   ```bash
-   git clone https://github.com/YourRepoName/job-listing-legitimacy-lens.git
+Experience or qualification requirements
+
+Benefits such as insurance, 401(k), PTO, retirement plans, and paid holidays
+
+Industry-standard HR language
+
+Positive indicators reduce risk incrementally, up to a safe maximum.
+
+Scoring System
+
+Final scores are categorized as follows:
+
+90–100 Likely Legitimate (based on available signals)
+
+70–89 Caution / Mixed Signals
+
+40–69 Mixed Signals requiring verification
+
+0–39 High Risk / Suspicious
+
+Legitimacy does not guarantee safety. This tool evaluates patterns, not company identity.
+
+Design Insight
+
+This project is still a work in progress.
+
+A key improvement came from feedback provided by a 9-year-old collaborator who emphasized the importance of balancing negative signals with positive indicators. Rebalancing the scoring model based on that insight significantly improved scoring accuracy and realism.
+
+Sometimes clarity comes from experience. Sometimes it comes from someone who understands balance instinctively.
+
+Getting Started
+Requirements
+
+Python 3.0 or higher
+
+Run the Tool on macOS
+
+Clone the repository:
+
+git clone https://github.com/YourRepoName/job-listing-legitimacy-lens.git
+cd job-listing-legitimacy-lens
+python3 job_lens.py
+
+Disclaimer
+
+This tool does not verify employers or job listings.
+It provides signal-based insights to support safer decision-making and user education.
