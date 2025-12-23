@@ -109,7 +109,7 @@ The tool assesses *patterns*, not real company identity.
 ---
 
 ### **6. Helpful User Guidance When Needed**
-If the tool detects uncertainty — for example, an unfamiliar job board — it now gently recommends:
+If the tool detects uncertainty, for example, an unfamiliar job board. It now gently recommends:
 
 > “This may be legitimate, but always double-check that you are on the employer’s official site.”
 
